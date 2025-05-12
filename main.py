@@ -22,7 +22,7 @@ t_bedrooms = df["total_bedrooms"].to_numpy() # Total number of bedrooms among al
 pop = df["population"].to_numpy() # Total number of people residing within a block.
 house = df["households"].to_numpy() # Total number of households, a group of people residing within a home unit, for a block.
 income = df["median_income"].to_numpy() # Median income for households within a block of houses (measured in tens of thousands of US Dollars)
-value = df["median_house_value"].to_numpy() # Median house value for households within a block (measured in US Dollars)
+value = df["median_house_value"].to_numpy() # Median house value for households within a block (measured in US Dollars) *** This is also the target ***
 #prox = df["ocean_proximity"].to_numpy() #Location of the house w.r.t ocean/sea. Ocean_proximity indicating (very roughly) whether each block group is near the ocean, near the Bay area, inland or on an island. This parameter will allows us include and interpret the categorical variable while regressing the dataset.
 
 #Normalization
@@ -52,6 +52,9 @@ pop = (pop - mu_pop)/(max(pop) - min(pop))
 house = (house - mu_house)/(max(house) - min(house))
 income = (income - mu_income)/(max(income) - min(income))
 value = (value - mu_value)/(max(value) - min(value))
+
+def multiple_linear_regression(long, lat, age, t_rooms, t_bedrooms, pop, house, income, value):
+
 
 missing_values_per_column = df.isnull().mean()
 print("Missing values per column:")
