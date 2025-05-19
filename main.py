@@ -53,7 +53,8 @@ house = (house - mu_house)/(max(house) - min(house))
 income = (income - mu_income)/(max(income) - min(income))
 value = (value - mu_value)/(max(value) - min(value))
 
-def multiple_linear_regression(long, lat, age, t_rooms, t_bedrooms, pop, house, income, value):
+X = np.stack((long, lat, age, t_rooms, t_bedrooms, pop, house, income), axis=1)
+
 
 
 missing_values_per_column = df.isnull().mean()
@@ -62,3 +63,37 @@ print(missing_values_per_column)
 
 print("--- DataFrame ---")
 print(df.to_string)
+
+def multiple_linear_regression_cl(X, y):
+
+    m, n = X.shape
+
+    X_b = np.c_[np.ones((m, 1)), X]
+
+    theta = np.linalg.inv(X_b.T @ X_b) @ X_b.T @ y
+
+    return theta
+
+theta = multiple_linear_regression_cl(X, value)
+
+print("Learned parameters (intercept first):", theta)
+
+def multiple_linear_regression_gd(X, y, lr=0.1, n_iters=1000):
+    m, n = X.shape
+    X_b = np.c_[np.ones((m,1)), X]
+    theta = np.zeros(n+1)
+
+    for i in range(n_iters):
+
+        preds = X_b @ theta
+
+        error = preds - y
+
+        grads = (2/m) * (X_b.T @ error)
+
+        theta -= lr * grads
+
+    return theta
+
+theta_gd = multiple_linear_regression_gd(X, value, lr=0.05, n_iters=2000)
+print("GD parameters:", theta_gd)
