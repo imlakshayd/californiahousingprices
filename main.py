@@ -1,10 +1,14 @@
 import os
 import sys
+
+import numpy
 import numpy as np
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 import sklearn
+
+matplotlib.use("TkAgg")  # This is used to show a plot in another window
 
 directory = "data/housing.csv"
 
@@ -55,45 +59,113 @@ value = (value - mu_value)/(max(value) - min(value))
 
 X = np.stack((long, lat, age, t_rooms, t_bedrooms, pop, house, income), axis=1)
 
+# Shuffle the data
+indices = np.arange(X.shape[0])
+np.random.seed(42)  # for reproducibility
+np.random.shuffle(indices)
 
+X = X[indices]
+value = value[indices]
+
+# 80% train, 20% test
+split = int(0.8 * X.shape[0])
+X_train, X_test = X[:split], X[split:]
+y_train, y_test = value[:split], value[split:]
 
 missing_values_per_column = df.isnull().mean()
 print("Missing values per column:")
 print(missing_values_per_column)
 
+def mean_squared_error(y_true, y_pred):
+    return np.mean((y_true - y_pred)**2)
+
+
 print("--- DataFrame ---")
-print(df.to_string)
+print(df.to_string())
 
 def multiple_linear_regression_cl(X, y):
 
-    m, n = X.shape
+    m, n = X.shape # M is number of data points, while n is the number of features i.e. long, lat ...
 
-    X_b = np.c_[np.ones((m, 1)), X]
+    X_b = np.c_[np.ones((m, 1)), X] # np.ones to create and column which is filled with 1 which is "m" long and is then added to the orginal matrix of x using np.c_
 
-    theta = np.linalg.inv(X_b.T @ X_b) @ X_b.T @ y
+    X_bt = numpy.transpose(X_b) # Transposing the array so we can calculate theta for each feature
+
+    theta = np.linalg.inv(X_bt @ X_b) @ X_bt @ y # Equation for theta which is our weights for each feature
 
     return theta
 
-theta = multiple_linear_regression_cl(X, value)
+theta_cf = multiple_linear_regression_cl(X_train, y_train)
 
-print("Learned parameters (intercept first):", theta)
+print("Learned parameters (intercept first):", theta_cf)
 
 def multiple_linear_regression_gd(X, y, lr=0.1, n_iters=1000):
     m, n = X.shape
     X_b = np.c_[np.ones((m,1)), X]
-    theta = np.zeros(n+1)
+    theta = np.zeros(n+1)  # Making it so each feature has a weight of 0 to begin with and using gradient descent algorithm it can tweak it to the optimal weights the plus 1 is for the bias
+    costs = []
 
     for i in range(n_iters):
 
-        preds = X_b @ theta
+        preds = X_b @ theta # y = X @ theta just matrix multiplication
 
         error = preds - y
+
+        cost = np.mean(error**2)
+
+        costs.append(cost)
 
         grads = (2/m) * (X_b.T @ error)
 
         theta -= lr * grads
 
-    return theta
+    return theta, costs
 
-theta_gd = multiple_linear_regression_gd(X, value, lr=0.05, n_iters=2000)
+theta_gd, costs = multiple_linear_regression_gd(X_train, y_train, lr=0.05, n_iters=2000)
+
 print("GD parameters:", theta_gd)
+
+m, n = X.shape
+
+X_test_b = np.c_[np.ones((X_test.shape[0], 1)), X_test]
+pred_cf = X_test_b @ theta_cf
+pred_gd = X_test_b @ theta_gd
+
+
+mse_cf = mean_squared_error(y_test, pred_cf)
+mse_gd = mean_squared_error(y_test, pred_gd)
+
+print("Test MSE (Closed-form):", mse_cf)
+print("Test MSE (GD):", mse_gd)
+
+residuals_cf = y_test - pred_cf
+residuals_gd = y_test - pred_gd
+
+plt.figure()
+plt.hist(residuals_cf, bins=50, alpha=0.5, label="Closed-form")
+plt.hist(residuals_gd, bins=50, alpha=0.5, label="Gradient Descent")
+plt.legend()
+plt.title("Residual Distribution")
+plt.xlabel("Residual (y - y_hat)")
+plt.ylabel("Frequency")
+
+plt.figure()
+plt.scatter(y_test, pred_cf, alpha=0.5, label="Closed-form")
+plt.scatter(y_test, pred_gd, alpha=0.5, label="Gradient Descent")
+plt.xlabel("True Normalized Value")
+plt.ylabel("Predicted Normalized Value")
+plt.title("Predictions vs. True Values")
+plt.legend()
+
+plt.figure()
+plt.scatter(pred_cf, pred_gd, alpha=0.5)
+plt.xlabel('Closed-form Prediction')
+plt.ylabel('GD Prediction')
+plt.title('GD vs. Closed-Form Predictions')
+
+plt.figure()
+plt.plot(costs)
+plt.xlabel('Iteration')
+plt.ylabel('Mean Squared Error')
+plt.title('Gradient Descent Convergence')
+plt.show()
