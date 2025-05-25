@@ -1,7 +1,3 @@
-import os
-import sys
-
-import numpy
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -103,7 +99,7 @@ def multiple_linear_regression_cl(X, y):
 
     X_b = np.c_[np.ones((d, 1)), X] # np.ones to create and column which is filled with 1 which is "d" long and is then added to the orginal matrix of x using np.c_
 
-    X_bt = numpy.transpose(X_b) # Transposing the array so we can calculate theta for each feature
+    X_bt = np.transpose(X_b) # Transposing the array so we can calculate theta for each feature
 
     theta = np.linalg.inv(X_bt @ X_b) @ X_bt @ y  # Equation for theta which is our weights for each feature
 
@@ -132,7 +128,7 @@ def multiple_linear_regression_gd(X, y, alpha=0.1, iterations=1000):
 
         costs.append(cost)
 
-        X_bt = numpy.transpose(X_b)
+        X_bt = np.transpose(X_b)
 
         descent = (2/d) * (X_bt @ error)
 
