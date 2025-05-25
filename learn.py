@@ -6,7 +6,11 @@ import numpy as np
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
-import sklearn
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn import preprocessing
+from sklearn.preprocessing import StandardScaler
 
 matplotlib.use("TkAgg")  # This is used to show a plot in another window
 
@@ -38,15 +42,22 @@ features = df[["longitude", "latitude", "housing_median_age", "total_rooms", "to
 
 value = df["median_house_value"].to_numpy()
 
-# Standardization
+# Standardization - changing this to z-score normalization instead because it is too large of a feature
 
-mins = np.min(features, axis=0)
-maxs = np.max(features, axis=0)
-mus = np.mean(features, axis=0)
+# mins = np.min(features, axis=0)
+# maxs = np.max(features, axis=0)
+# mus = np.mean(features, axis=0)
+#
+# X = (features - mus)/(maxs - mins)
+#
+# value_scaled = (value - np.mean(value))/(np.max(value) - np.min(value)) # We only use this scaled value with out manual models because they need it but scikit-learn can use unscaled models
 
-X = (features - mus)/(maxs - mins)
+# Normalization
+value_scaled = (value - np.mean(value)) / np.std(value)
 
-value = (value - np.mean(value))/(np.max(value) - np.min(value))
+scaler = StandardScaler()
+
+X = scaler.fit_transform(features)
 
 missing_values_per_column = df.isnull().mean()
 print("Missing values per column:")
@@ -57,19 +68,34 @@ print(df.to_string())
 
 # Data splitting
 # Shuffle the data
-indices = np.arange(X.shape[0])
-np.random.seed(42)
-np.random.shuffle(indices)
-
-X = X[indices]
-value = value[indices]
+# indices = np.arange(X.shape[0])
+# np.random.seed(42)
+# np.random.shuffle(indices)
+#
+# X = X[indices]
+# value = value[indices]
 
 # 80% train, 20% test
-split = int(.8 * X.shape[0])
-X_train, X_test = X[:split], X[split:]
-y_train, y_test = value[:split], value[split:]
+# split = int(.8 * X.shape[0])
+# X_train, X_test = X[:split], X[split:]
+# y_train, y_test = value[:split], value[split:]
 
-def mean_squared_error(y_true, y_pred):
+
+X_train, X_test, y_train, y_test = train_test_split(X, value, test_size=0.2, random_state=42)
+
+mean_y = np.mean(y_train)
+std_y = np.std(y_train)
+
+y_train_scaled = (y_train - mean_y) / std_y
+y_test_scaled = (y_test - mean_y) / std_y
+
+model = LinearRegression()
+
+model.fit(X_train, y_train)
+
+predictions = model.predict(X_test)
+
+def mse_manual(y_true, y_pred):
     return np.mean((y_true - y_pred)**2)
 
 def multiple_linear_regression_cl(X, y):
@@ -83,7 +109,7 @@ def multiple_linear_regression_cl(X, y):
 
     return theta
 
-theta_cf = multiple_linear_regression_cl(X_train, y_train)
+theta_cf = multiple_linear_regression_cl(X_train, y_train_scaled)
 
 print("Learned parameters (intercept first):", theta_cf)
 
@@ -110,11 +136,15 @@ def multiple_linear_regression_gd(X, y, alpha=0.1, iterations=1000):
 
         descent = (2/d) * (X_bt @ error)
 
+        if np.isnan(theta).any() or np.isinf(theta).any():
+            print("NaN or Inf detected!")
+            break
+
         theta -= alpha * descent
 
     return theta, costs
 
-theta_gd, costs = multiple_linear_regression_gd(X_train, y_train, alpha=0.05, iterations=5000)
+theta_gd, costs = multiple_linear_regression_gd(X_train, y_train_scaled, alpha=0.01, iterations=5000)
 print("GD parameters:", theta_gd)
 
 d, n = X.shape
@@ -125,11 +155,20 @@ pred_cf = X_test_b @ theta_cf
 
 pred_gd = X_test_b @ theta_gd
 
-mse_cf = mean_squared_error(y_test, pred_cf)
-mse_gd = mean_squared_error(y_test, pred_gd)
+# Unscaling the predictions so they all are on the same scale which will be in dollars
+pred_cd_unscaled = pred_cf * std_y + mean_y
+pred_gd_unscaled = pred_gd * std_y + mean_y
 
-residuals_cf = y_test - pred_cf
-residuals_gd = y_test - pred_gd
+mse_cf = mse_manual(y_test, pred_cd_unscaled)
+mse_gd = mse_manual(y_test, pred_gd_unscaled)
+mse_sklearn = mean_squared_error(y_test, predictions)
+
+print("MSE (Closed-form):", mse_cf)
+print("MSE (Gradient Descent):", mse_gd)
+print("MSE (Scikit-learn):", mse_sklearn)
+
+residuals_cf = y_test_scaled - pred_cf
+residuals_gd = y_test_scaled - pred_gd
 
 plt.figure()
 plt.hist(residuals_cf, bins=50, alpha=0.5, label="Closed-form") # Alpha used here is about the opacity of the graph not the learning rate
@@ -140,8 +179,8 @@ plt.xlabel("Residual (actual - predictions)")
 plt.ylabel("Frequency")
 
 plt.figure()
-plt.scatter(y_test, pred_cf, alpha=0.5, label="Closed-from") # Alpha used here is about the opacity of the graph not the learning rate
-plt.scatter(y_test, pred_gd, alpha=0.5, label="Gradient Descent") # Alpha used here is about the opacity of the graph not the learning rate
+plt.scatter(y_test_scaled, pred_cf, alpha=0.5, label="Closed-from") # Alpha used here is about the opacity of the graph not the learning rate
+plt.scatter(y_test_scaled, pred_gd, alpha=0.5, label="Gradient Descent") # Alpha used here is about the opacity of the graph not the learning rate
 plt.xlabel("True Normalized Value")
 plt.ylabel("Predicted Normalized Value")
 plt.title("Predictions vs. True Values")
@@ -154,8 +193,8 @@ plt.ylabel('GD Prediction')
 plt.title('GD vs. Closed-Form Predictions')
 
 plt.figure()
-for alpha in [0.005, 0.05, 0.5]:
-    theta_gd, costs = multiple_linear_regression_gd(X_train, y_train, alpha, iterations=5000)
+for alpha in [0.0001, 0.001, 0.01]:
+    theta_gd, costs = multiple_linear_regression_gd(X_train, y_train_scaled, alpha, iterations=5000)
     plt.plot(costs, label=f"α = {alpha}")
 plt.xlabel('Iteration')
 plt.ylabel('Mean Squared Error')
